@@ -1,0 +1,242 @@
+"use client";
+import TimeLineChart from "@/components/charts/TimeLineChart";
+import Card from "@/components/card";
+import React, { useEffect, useState } from "react";
+import { Events, filteredEvents } from "@/types/hook";
+import { TimelineChartOptions } from "@/variables/charts";
+import moment from "moment-timezone";
+import MiniCalendar from "@/components/calendar/MiniCalendar";
+import { MdOutlineCalendarToday } from "react-icons/md";
+import LineChart from "./LineChart"; // Import the LineChart component
+import { RiLineChartLine } from "react-icons/ri";
+import LineChartLine from "./LineChartLine";
+
+interface ChartData {
+  name: string;
+  color?: string;
+  data: { x: string; y: number[] }[];
+}
+
+const convertToJakartaTime = (timestamp: string, duration: number) => {
+  const startUtc = moment.utc(timestamp);
+  const endUtc = startUtc.clone().add(duration, "seconds");
+  const startJakarta = startUtc.tz("Asia/Jakarta");
+  const endJakarta = endUtc.tz("Asia/Jakarta");
+
+  return {
+    startTimestamp: startJakarta.valueOf(),
+    endTimestamp: endJakarta.valueOf(),
+  };
+};
+
+const filterAndFormatData = (
+  events: Events[],
+  date: Date,
+  type: string
+): ChartData[] => {
+  const windowColors = [
+    "#FF5733",
+    "#FFBD33",
+    "#33FF57",
+    "#33FFBD",
+    "#5733FF",
+    "#BD33FF",
+    "#33FFFF",
+    "#FF33BD",
+    "#33BDFF",
+    "#BDFF33",
+    "#FF3333",
+    "#33FF33",
+    "#3333FF",
+    "#FFFF33",
+    "#33FFFF",
+    "#FF33FF",
+    "#FF5733",
+    "#FFBD33",
+    "#33FF57",
+    "#33FFBD",
+  ];
+
+  const windowTitleToColor: Record<string, string> = {};
+
+  return events
+    .filter((item: Events) => {
+      const eventDate = moment.utc(item.timestamp);
+      return (
+        eventDate.date() === date.getDate() &&
+        eventDate.month() === date.getMonth() &&
+        eventDate.year() === date.getFullYear()
+      );
+    })
+    .flatMap((item: any) => {
+      const { startTimestamp, endTimestamp } = convertToJakartaTime(
+        item.timestamp,
+        item.duration
+      );
+      if (type === "window" && item.data.title !== "") {
+        const name = item.data.title;
+        const color =
+          windowTitleToColor[name] ||
+          windowColors[Object.keys(windowTitleToColor).length % 20];
+        windowTitleToColor[name] = color;
+        return [
+          {
+            name,
+            color,
+            data: [
+              {
+                x: "Windows",
+                y: [startTimestamp, endTimestamp],
+              },
+            ],
+          },
+        ] as ChartData[];
+      } else if (type === "input" && item.data.presses) {
+        const name = `Keyboard Presses ${item.data.presses.toString()}`;
+        const color = "#080C88"; // Color for input events
+        return [
+          {
+            name,
+            color,
+            data: [
+              {
+                x: "Input",
+                y: [startTimestamp, endTimestamp],
+              },
+            ],
+          },
+        ] as ChartData[];
+      } else {
+        return [];
+      }
+    });
+};
+
+function Timeline({
+  stats,
+  dateSelected,
+  changeDateHandler,
+}: {
+  stats: filteredEvents;
+  dateSelected: Date;
+  changeDateHandler: (date: Date) => void;
+}) {
+  const [calendar, setCalendar] = useState<boolean>(false);
+  const [dateNow, setDateNow] = useState<Date>(dateSelected);
+  const dateString = moment(dateNow).format("DD MMMM YYYY");
+  const DateTimestamp = new Set<string>();
+  stats.windowEvents.forEach((value) => {
+    const date = new Date(value.timestamp);
+    DateTimestamp.add(date.toISOString().split("T")[0]);
+  });
+  useEffect(() => {
+    setDateNow(moment(dateSelected).toDate());
+  }, [dateSelected]);
+  const chartDataWindow: ChartData[] = filterAndFormatData(
+    stats.windowEvents,
+    dateNow,
+    "window"
+  );
+  const chartDataInput: ChartData[] = filterAndFormatData(
+    stats.inputEvents,
+    dateNow,
+    "input"
+  );
+  const chartDataAfk: ChartData[] = filterAndFormatData(
+    stats.afkEvents,
+    dateNow,
+    "afk"
+  );
+  const chartDataCursor: ChartData[] = filterAndFormatData(
+    stats.cursorEvents,
+    dateNow,
+    "cursor"
+  );
+  const chartData: ChartData[] = [
+    ...chartDataWindow,
+    ...chartDataInput,
+    ...chartDataAfk,
+    ...chartDataCursor,
+  ];
+
+  return (
+    <div>
+      <Card extra="!p-[20px] text-center">
+        <button
+          className="flex items-center justify-center gap-2 p-2 mt-1 text-gray-600 transition duration-200 rounded-lg linear bg-lightPrimary hover:cursor-pointer hover:bg-gray-100 active:bg-gray-200 dark:bg-navy-700 dark:hover:opacity-90 dark:active:opacity-80"
+          onClick={() => setCalendar(!calendar)}
+        >
+          <MdOutlineCalendarToday />
+          <span className="text-sm font-medium text-gray-600">
+            {calendar ? "Close" : "Select a month"}
+          </span>
+        </button>
+
+        {calendar ? (
+          <div className="absolute z-10 mt-10">
+            <MiniCalendar
+              value={dateSelected}
+              onChange={changeDateHandler}
+              view={"month"}
+              tileDisabled={({ date }: { date: Date }) => {
+                const jakartaDate = moment(date).tz("Asia/Jakarta");
+                const formattedDate = jakartaDate.format("YYYY-MM-DD");
+                const isDateDisabled = DateTimestamp.has(formattedDate);
+
+                return !isDateDisabled;
+              }}
+            />
+          </div>
+        ) : null}
+        {chartData.length > 0 ? (
+          <div>
+            <p className="mt-[20px] text-3xl font-bold text-navy-700 dark:text-white">
+              {dateString}
+            </p>
+            <p className="mt-2 text-sm text-center text-gray-600">
+              This is the timeline with windows events, input events, and afk events
+            </p>
+            <TimeLineChart
+              chartData={chartData}
+              chartOptions={TimelineChartOptions}
+            />
+          </div>
+        ) : (
+          <p className="mt-[20px] text-3xl font-bold text-navy-700 dark:text-white">
+            Please Select a Date
+          </p>
+        )}
+      </Card>
+      <Card extra="!p-[30px] gap-x-5 mt-7 text-center">
+        <LineChartLine
+          chartData={chartData}
+          chartOptions={TimelineChartOptions}
+        />
+      </Card>
+      <Card extra="!p-[30px] gap-x-5 mt-7 text-center">
+        <LineChart
+          chartData={[
+            {
+              name: "Garis Anda",
+              color: "biru",
+              data: [
+                { x: "Label 1", y: [10, 20] },
+                { x: "Label 2", y: [15, 25] },
+                { x: "Label 3", y: [12, 22] },
+                { x: "Label 4", y: [18, 28] },
+                { x: "Label 5", y: [14, 24] },
+              ],
+            },
+          ]}
+          chartOptions={{
+            xaxis: {
+              categories: ["Label 1", "Label 2", "Label 3", "Label 4", "Label 5"],
+            // Add other options as needed
+          }}
+        />
+      </Card>
+    </div>
+  );
+}
+
+export default Timeline;
