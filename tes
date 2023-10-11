@@ -1,63 +1,4 @@
-"use client";
-import TimeLineChart from "@/components/charts/TimeLineChart";
-import Card from "@/components/card";
-import React, { useEffect, useState } from "react";
-import { Events, filteredEvents } from "@/types/hook";
-import { TimelineChartOptions } from "@/variables/charts";
-import moment from "moment-timezone";
-import MiniCalendar from "@/components/calendar/MiniCalendar";
-import { MdOutlineCalendarToday } from "react-icons/md";
-import LineChart from "./LineChart"; // Import the LineChart component
-import { RiLineChartLine } from "react-icons/ri";
-import LineChartLine from "./LineChartLine";
-
-interface ChartData {
-  name: string;
-  color?: string;
-  data: { x: string; y: number[] }[];
-}
-
-const convertToJakartaTime = (timestamp: string, duration: number) => {
-  const startUtc = moment.utc(timestamp);
-  const endUtc = startUtc.clone().add(duration, "seconds");
-  const startJakarta = startUtc.tz("Asia/Jakarta");
-  const endJakarta = endUtc.tz("Asia/Jakarta");
-
-  return {
-    startTimestamp: startJakarta.valueOf(),
-    endTimestamp: endJakarta.valueOf(),
-  };
-};
-
-const filterAndFormatData = (
-  events: Events[],
-  date: Date,
-  type: string
-): ChartData[] => {
-  const windowColors = [
-    "#FF5733",
-    "#FFBD33",
-    "#33FF57",
-    "#33FFBD",
-    "#5733FF",
-    "#BD33FF",
-    "#33FFFF",
-    "#FF33BD",
-    "#33BDFF",
-    "#BDFF33",
-    "#FF3333",
-    "#33FF33",
-    "#3333FF",
-    "#FFFF33",
-    "#33FFFF",
-    "#FF33FF",
-    "#FF5733",
-    "#FFBD33",
-    "#33FF57",
-    "#33FFBD",
-  ];
-
-  const windowTitleToColor: Record<string, string> = {};
+const windowTitleToColor: Record<string, string> = {};
 
   return events
     .filter((item: Events) => {
@@ -77,7 +18,9 @@ const filterAndFormatData = (
         const name = item.data.title;
         const color =
           windowTitleToColor[name] ||
-          windowColors[Object.keys(windowTitleToColor).length % 20];
+          windowColors[
+            Object.keys(windowTitleToColor).length % windowColors.length
+          ];
         windowTitleToColor[name] = color;
         return [
           {
@@ -93,7 +36,7 @@ const filterAndFormatData = (
         ] as ChartData[];
       } else if (type === "input" && item.data.presses) {
         const name = `Keyboard Presses ${item.data.presses.toString()}`;
-        const color = "#080C88"; // Color for input events
+        const color = "#080C88";
         return [
           {
             name,
@@ -129,9 +72,7 @@ function Timeline({
     const date = new Date(value.timestamp);
     DateTimestamp.add(date.toISOString().split("T")[0]);
   });
-  useEffect(() => {
-    setDateNow(moment(dateSelected).toDate());
-  }, [dateSelected]);
+
   const chartDataWindow: ChartData[] = filterAndFormatData(
     stats.windowEvents,
     dateNow,
@@ -194,7 +135,7 @@ function Timeline({
               {dateString}
             </p>
             <p className="mt-2 text-sm text-center text-gray-600">
-              This is the timeline with windows events, input events, and afk events
+              This is the timeline with windows events, input events and afk events
             </p>
             <TimeLineChart
               chartData={chartData}
@@ -213,30 +154,3 @@ function Timeline({
           chartOptions={TimelineChartOptions}
         />
       </Card>
-      <Card extra="!p-[30px] gap-x-5 mt-7 text-center">
-        <LineChart
-          chartData={[
-            {
-              name: "Garis Anda",
-              color: "biru",
-              data: [
-                { x: "Label 1", y: [10, 20] },
-                { x: "Label 2", y: [15, 25] },
-                { x: "Label 3", y: [12, 22] },
-                { x: "Label 4", y: [18, 28] },
-                { x: "Label 5", y: [14, 24] },
-              ],
-            },
-          ]}
-          chartOptions={{
-            xaxis: {
-              categories: ["Label 1", "Label 2", "Label 3", "Label 4", "Label 5"],
-            // Add other options as needed
-          }}
-        />
-      </Card>
-    </div>
-  );
-}
-
-export default Timeline;
